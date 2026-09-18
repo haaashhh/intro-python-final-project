@@ -1,14 +1,24 @@
 [project]
 name = "trailstats"
 version = "0.1.0"
-description = "Add your description here"
+description = "Offline analysis of GPX activity recordings: distance, elevation, pace, splits and a training log"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name = "ash", email = "achrafrachek1@gmail.com" }
+    { name = "achraf", email = "achraf.rachek@tu-dortmund.de" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[project.urls]
+Homepage = "https://github.com/haaashhh/intro-python-final-project"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+]
