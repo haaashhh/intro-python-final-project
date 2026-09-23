@@ -20,11 +20,14 @@ def haversine(
         lon1: Longitude of the first point
         lat2: Latitude of the second point
         lon2: Longitude of the second point
-        
+
         Distance in km
     """
     phi1, lam1, phi2, lam2 = np.radians([lat1, lon1, lat2, lon2])
-    a = np.sin((phi2 - phi1) / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin((lam2 - lam1) / 2) ** 2
+    a = (
+        np.sin((phi2 - phi1) / 2) ** 2
+        + np.cos(phi1) * np.cos(phi2) * np.sin((lam2 - lam1) / 2) ** 2
+    )
     return 2 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(a))
 
 
@@ -47,6 +50,5 @@ def cumulative_distance(track: Track) -> np.ndarray:
 
 
 def total_distance(track: Track) -> float:
-    """Total length of the track in km
-    """
+    """Total length of the track in km"""
     return float(step_distances(track).sum())

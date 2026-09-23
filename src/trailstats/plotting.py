@@ -1,7 +1,8 @@
-"""Matplotlib figures for activity tracks."""
+"""Matplotlib figures for activity tracks"""
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
 
@@ -147,4 +148,74 @@ def plot_overview(track: Track) -> Figure:
     plot_map(track, figure.add_subplot(grid[0, 0]))
     plot_elevation(track, figure.add_subplot(grid[0, 1]))
     plot_pace(track, axes=figure.add_subplot(grid[1, :]))
+    return figure
+
+
+def plot_weekly(weekly: pd.DataFrame, axes: plt.Axes | None = None) -> plt.Axes:
+    """Draw weekly distance as bars with the elevation gain beside it."""
+    if axes is None:
+        _, axes = plt.subplots(figsize=(9, 3.6))
+
+    labels = weekly["week"].dt.strftime("%d %b")
+    positions = np.arange(len(weekly))
+
+    axes.bar(positions, weekly["distance_km"], width=0.62, color=LINE_COLOR)
+    for position, value in zip(positions, weekly["distance_km"], strict=True):
+        axes.annotate(
+            f"{value:.0f}",
+            (position, value),
+            textcoords="offset points",
+            xytext=(0, 4),
+            ha="center",
+            fontsize=8,
+            color=TEXT_COLOR,
+        )
+
+    axes.set_xticks(positions, labels)
+    axes.set_xlabel("week beginning")
+    axes.set_ylabel("distance (km)")
+    axes.set_title("Weekly distance", color=TEXT_COLOR, loc="left")
+    axes.margins(y=0.18)
+    _style_axes(axes)
+    axes.grid(axis="x", visible=False)
+    return axes
+
+
+SERIES_COLORS = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#4a3aa7")
+
+
+def plot_comparison(
+    tracks: list[Track], window: int = 30, relative_elevation: bool = True
+) -> Figure:
+    figure, (top, bottom) = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+
+    for position, track in enumerate(tracks):
+        color = SERIES_COLORS[position % len(SERIES_COLORS)]
+        frame = to_dataframe(track)
+        label = track.name[:28]
+
+        elevation = smooth_elevation(frame)
+        if relative_elevation:
+            elevation = elevation - elevation.iloc[0]
+        top.plot(frame["dist_km"], elevation, color=color, linewidth=2, label=label)
+
+        speed = frame["speed_ms"].where(moving_mask(frame))
+        speed = speed.rolling(window, center=True, min_periods=1).mean()
+        pace = (1000 / (speed * 60)).replace([np.inf, -np.inf], np.nan)
+        pace = pace.where(pace < pace.median() * 2.5)
+        bottom.plot(frame["dist_km"], pace, color=color, linewidth=2, label=label)
+
+    top.set_ylabel("elevation change (m)" if relative_elevation else "elevation (m)")
+    top.set_title("Elevation profile", color=TEXT_COLOR, loc="left")
+    top.legend(frameon=False, fontsize=9, labelcolor=TEXT_COLOR)
+
+    bottom.invert_yaxis()
+    bottom.yaxis.set_major_formatter(_pace_formatter)
+    bottom.set_xlabel("distance (km)")
+    bottom.set_ylabel("pace (min/km)")
+    bottom.set_title("Pace", color=TEXT_COLOR, loc="left")
+
+    for axes in (top, bottom):
+        _style_axes(axes)
+    figure.tight_layout()
     return figure

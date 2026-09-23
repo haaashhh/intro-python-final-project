@@ -33,12 +33,16 @@ def to_dataframe(track: Track) -> pd.DataFrame:
     frame["time"] = pd.to_datetime(frame["time"], utc=True)
     frame["dt_s"] = frame["time"].diff().dt.total_seconds().fillna(0.0)
     frame["speed_ms"] = np.where(
-        frame["dt_s"] > 0, frame["step_km"] * 1000 / frame["dt_s"].replace(0, np.nan), 0.0
+        frame["dt_s"] > 0,
+        frame["step_km"] * 1000 / frame["dt_s"].replace(0, np.nan),
+        0.0,
     )
     return frame
 
 
-def smooth_elevation(frame: pd.DataFrame, window: int = DEFAULT_SMOOTH_WINDOW) -> pd.Series:
+def smooth_elevation(
+    frame: pd.DataFrame, window: int = DEFAULT_SMOOTH_WINDOW
+) -> pd.Series:
     """Smooth raw GPS elevation with a centred rolling median."""
     return frame["ele"].rolling(window, center=True, min_periods=1).median()
 
@@ -135,6 +139,7 @@ def summarize(
         max_elevation_m=float(frame["ele"].max()) if has_elevation else None,
     )
 
+
 @dataclass(frozen=True)
 class Split:
     """One fixed-distance section of an activity."""
@@ -230,7 +235,9 @@ def best_effort(track: Track, distance_km: float) -> BestEffort | None:
     best: BestEffort | None = None
     end = 0
     for start in range(len(cumulative)):
-        while end < len(cumulative) and cumulative[end] - cumulative[start] < distance_km:
+        while (
+            end < len(cumulative) and cumulative[end] - cumulative[start] < distance_km
+        ):
             end += 1
         if end >= len(cumulative):
             break

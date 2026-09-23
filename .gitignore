@@ -15,3 +15,6 @@ dist/
 
 # generated output
 figures/
+
+# generated output
+*.csv
