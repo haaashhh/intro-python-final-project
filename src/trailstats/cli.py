@@ -82,7 +82,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     summary.set_defaults(handler=summary_command)
 
+
+    plot = subcommands.add_parser("plot", help="draw figures for one activity")
+    plot.add_argument("path", help="path to a .gpx file")
+    plot.add_argument("--kind", choices=["all", "map", "elevation", "pace"], default="all",
+                      help="which figure to draw (default: %(default)s)")
+    plot.add_argument("--out", metavar="FILE", help="save to a file instead of opening a window")
+    plot.set_defaults(handler=plot_command)
+
+
     return parser
+
+
+def plot_command(args: argparse.Namespace) -> int:
+    """Render figures for one activity."""
+    from trailstats import plotting
+
+    track = load_gpx(args.path)
+    builders = {
+        "map": plotting.plot_map,
+        "elevation": plotting.plot_elevation,
+        "pace": plotting.plot_pace,
+    }
+    if args.kind == "all":
+        figure = plotting.plot_overview(track)
+    else:
+        figure = builders[args.kind](track).figure
+
+    if args.out:
+        figure.savefig(args.out, dpi=150, bbox_inches="tight")
+        print(f"wrote {args.out}")
+    else:
+        plotting.plt.show()
+    return 0
+
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -92,3 +125,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"error: {exc}")
         return 1
+
+
