@@ -20,8 +20,7 @@ def haversine(
         lon1: Longitude of the first point
         lat2: Latitude of the second point
         lon2: Longitude of the second point
-
-    Returns:
+        
         Distance in km
     """
     phi1, lam1, phi2, lam2 = np.radians([lat1, lon1, lat2, lon2])

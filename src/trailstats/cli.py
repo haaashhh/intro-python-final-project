@@ -2,8 +2,10 @@
 
 import argparse
 from collections.abc import Sequence
-
+from trailstats.analysis import DEFAULT_SMOOTH_WINDOW, DEFAULT_STOP_SPEED_MS, summarize
 from trailstats.gpx import load_gpx
+
+from datetime import time, timedelta
 
 
 def _format_bounds(bounds: tuple[float, float, float, float]) -> str:
@@ -11,21 +13,44 @@ def _format_bounds(bounds: tuple[float, float, float, float]) -> str:
     return f"{min_lat:.5f}, {min_lon:.5f} to {max_lat:.5f}, {max_lon:.5f}"
 
 
-def summary_command(args: argparse.Namespace) -> int:
-    """Print an overview of a single activity file"""
-    track = load_gpx(args.path)
+def _format_pace(pace: timedelta | None) -> str:
+    if pace is None:
+        return "n/a"
+    total = int(pace.total_seconds())
+    return f"{total // 60}:{total % 60:02d} /km"
 
-    print(f"{track.name}")
-    print(f"  file           {args.path}")
+
+def _format_duration(value: timedelta | None) -> str:
+    if value is None:
+        return "n/a"
+    total = int(value.total_seconds())
+    return f"{total // 3600}:{total % 3600 // 60:02d}:{total % 60:02d}"
+
+
+def summary_command(args: argparse.Namespace) -> int:
+    """Print an overview of a single activity file."""
+    track = load_gpx(args.path)
+    stats = summarize(
+        track,
+        smooth_window=args.smooth,
+        stop_speed_ms=args.stop_speed,
+    )
+
+    print(track.name)
     print(f"  points         {len(track)}")
-    print(f"  elevation      {'yes' if track.has_elevation else 'incomplete'}")
-    print(f"  timestamps     {'yes' if track.has_time else 'incomplete'}")
     if track.start_time is not None:
         print(f"  start          {track.start_time:%Y-%m-%d %H:%M:%S %Z}")
-    if track.duration is not None:
-        print(f"  duration       {track.duration}")
-    print(f"  bounds         {_format_bounds(track.bounds)}")
+    print(f"  distance       {stats.distance_km:.2f} km")
+    print(f"  duration       {_format_duration(stats.duration)}")
+    print(f"  moving time    {_format_duration(stats.moving_time)}")
+    print(f"  average pace   {_format_pace(stats.average_pace)}")
+    print(f"  moving pace    {_format_pace(stats.moving_pace)}")
+    if stats.max_elevation_m is not None:
+        print(f"  elevation      {stats.min_elevation_m:.0f} - {stats.max_elevation_m:.0f} m")
+        print(f"  ascent         {stats.elevation_gain_m:.0f} m (raw GPS: {stats.raw_elevation_gain_m:.0f} m)")
+        print(f"  descent        {stats.elevation_loss_m:.0f} m")
     return 0
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +66,20 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print an overview of one activity file.",
     )
     summary.add_argument("path", help="path to a .gpx file")
+    summary.add_argument(
+        "--smooth",
+        type=int,
+        default=DEFAULT_SMOOTH_WINDOW,
+        metavar="N",
+        help="rolling median window for elevation (default: %(default)s)",
+    )
+    summary.add_argument(
+        "--stop-speed",
+        type=float,
+        default=DEFAULT_STOP_SPEED_MS,
+        metavar="MS",
+        help="speed below which a point counts as stopped, m/s (default: %(default)s)",
+    )
     summary.set_defaults(handler=summary_command)
 
     return parser
