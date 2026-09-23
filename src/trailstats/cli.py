@@ -4,6 +4,7 @@ import argparse
 from collections.abc import Sequence
 from trailstats.analysis import DEFAULT_SMOOTH_WINDOW, DEFAULT_STOP_SPEED_MS, summarize
 from trailstats.gpx import load_gpx
+from trailstats.analysis import best_effort, splits
 
 from datetime import time, timedelta
 
@@ -90,6 +91,19 @@ def build_parser() -> argparse.ArgumentParser:
     plot.add_argument("--out", metavar="FILE", help="save to a file instead of opening a window")
     plot.set_defaults(handler=plot_command)
 
+    split_parser = subcommands.add_parser("splits", help="show per-kilometre splits")
+    split_parser.add_argument("path", help="path to a .gpx file")
+    split_parser.add_argument("--km", type=float, default=1.0, metavar="KM",
+                              help="split length in kilometres (default: %(default)s)")
+    split_parser.set_defaults(handler=splits_command)
+
+    best = subcommands.add_parser("best", help="find the fastest sections")
+    best.add_argument("path", help="path to a .gpx file")
+    best.add_argument("--distance", type=float, nargs="+", default=[1.0, 5.0, 10.0],
+                      metavar="KM", help="distances to search for (default: 1 5 10)")
+    best.set_defaults(handler=best_command)
+
+
 
     return parser
 
@@ -118,6 +132,41 @@ def plot_command(args: argparse.Namespace) -> int:
 
 
 
+
+def splits_command(args: argparse.Namespace) -> int:
+    """Print per-kilometre splits for one activity."""
+    track = load_gpx(args.path)
+
+    print(f"{track.name}")
+    print(f"  {'#':>3}  {'distance':>8}  {'time':>8}  {'pace':>9}  {'ascent':>6}")
+    for split in splits(track, split_km=args.km):
+        print(
+            f"  {split.index:>3}  {split.distance_km:>7.2f}km"
+            f"  {_format_duration(split.duration):>8}"
+            f"  {_format_pace(split.pace):>9}"
+            f"  {split.elevation_gain_m:>5.0f}m"
+        )
+    return 0
+
+
+def best_command(args: argparse.Namespace) -> int:
+    """Print the fastest section of one or more distances."""
+    track = load_gpx(args.path)
+
+    print(f"{track.name}")
+    for distance in args.distance:
+        effort = best_effort(track, distance)
+        if effort is None:
+            print(f"  {distance:>5}km  not reached")
+        else:
+            print(
+                f"  {distance:>5}km  {_format_duration(effort.duration):>8}"
+                f"  {_format_pace(effort.pace):>9}  starting at {effort.start_km:.2f} km"
+            )
+    return 0
+
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -125,5 +174,4 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         print(f"error: {exc}")
         return 1
-
 

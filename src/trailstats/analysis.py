@@ -134,3 +134,111 @@ def summarize(
         min_elevation_m=float(frame["ele"].min()) if has_elevation else None,
         max_elevation_m=float(frame["ele"].max()) if has_elevation else None,
     )
+
+@dataclass(frozen=True)
+class Split:
+    """One fixed-distance section of an activity."""
+
+    index: int
+    distance_km: float
+    duration: timedelta | None
+    elevation_gain_m: float
+
+    @property
+    def pace(self) -> timedelta | None:
+        """Pace of this split, per kilometre."""
+        if self.duration is None or self.distance_km <= 0:
+            return None
+        return self.duration / self.distance_km
+
+
+def splits(
+    track: Track,
+    split_km: float = 1.0,
+    smooth_window: int = DEFAULT_SMOOTH_WINDOW,
+    elevation_threshold_m: float = DEFAULT_ELEVATION_THRESHOLD_M,
+) -> list[Split]:
+    """Break a track into sections of ``split_km`` kilometres each.
+
+    The last split is usually shorter than the others; its pace is still
+    reported per kilometre so that it stays comparable to the rest.
+    """
+    frame = to_dataframe(track)
+    if frame.empty:
+        return []
+
+    frame = frame.assign(
+        smoothed=smooth_elevation(frame, smooth_window),
+        split=(frame["dist_km"] // split_km).astype(int),
+    )
+
+    result = []
+    previous_km = 0.0
+    previous_time = frame["time"].iloc[0]
+    for index, section in frame.groupby("split", sort=True):
+        end_km = float(section["dist_km"].iloc[-1])
+        end_time = section["time"].iloc[-1]
+        duration = None
+        if pd.notna(end_time) and pd.notna(previous_time):
+            duration = (end_time - previous_time).to_pytimedelta()
+        gain, _ = elevation_gain(section["smoothed"], elevation_threshold_m)
+
+        result.append(
+            Split(
+                index=int(index) + 1,
+                distance_km=end_km - previous_km,
+                duration=duration,
+                elevation_gain_m=gain,
+            )
+        )
+        previous_km, previous_time = end_km, end_time
+    return result
+
+
+@dataclass(frozen=True)
+class BestEffort:
+    """The fastest section of a given distance within an activity."""
+
+    distance_km: float
+    duration: timedelta
+    start_km: float
+
+    @property
+    def pace(self) -> timedelta:
+        """Pace of the effort, per kilometre."""
+        return self.duration / self.distance_km
+
+
+def best_effort(track: Track, distance_km: float) -> BestEffort | None:
+    """Find the fastest continuous section covering ``distance_km``.
+
+    Uses a sliding window over the cumulative distance, so the search costs
+    one pass over the track regardless of how long it is.
+
+    returns fastest effort, or None if the track is shorter than the requested
+        distance or has no usable timestamps.
+    """
+    frame = to_dataframe(track)
+    if frame.empty or not track.has_time:
+        return None
+
+    cumulative = frame["dist_km"].to_numpy()
+    seconds = (frame["time"] - frame["time"].iloc[0]).dt.total_seconds().to_numpy()
+    if cumulative[-1] < distance_km:
+        return None
+
+    best: BestEffort | None = None
+    end = 0
+    for start in range(len(cumulative)):
+        while end < len(cumulative) and cumulative[end] - cumulative[start] < distance_km:
+            end += 1
+        if end >= len(cumulative):
+            break
+        elapsed = timedelta(seconds=float(seconds[end] - seconds[start]))
+        if best is None or elapsed < best.duration:
+            best = BestEffort(
+                distance_km=distance_km,
+                duration=elapsed,
+                start_km=float(cumulative[start]),
+            )
+    return best
