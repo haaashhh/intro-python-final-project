@@ -149,10 +149,12 @@ def build_parser() -> argparse.ArgumentParser:
     compare = subcommands.add_parser("compare", help="compare several activities")
     compare.add_argument("paths", nargs="+", help="two or more .gpx files")
     compare.add_argument("--out", metavar="FILE", help="save the comparison chart")
-    compare.add_argument("--absolute", action="store_true",
-                         help="plot absolute elevation instead of change from the start")
+    compare.add_argument(
+        "--absolute",
+        action="store_true",
+        help="plot absolute elevation instead of change from the start",
+    )
     compare.set_defaults(handler=compare_command)
-
 
     return parser
 
@@ -252,7 +254,7 @@ def log_command(args: argparse.Namespace) -> int:
         )
         for row in weekly.itertuples():
             print(
-                f"{row.week:%Y-%m-%d:<12} {row.activities:>5}"
+                f"{row.week:%Y-%m-%d}   {row.activities:>5}"
                 f" {row.distance_km:>8.1f}km {row.hours:>7.1f} {row.elevation_gain_m:>7.0f}m"
             )
 
@@ -269,6 +271,7 @@ def log_command(args: argparse.Namespace) -> int:
         print(f"wrote {args.plot}")
 
     return 0
+
 
 def compare_command(args: argparse.Namespace) -> int:
     """Compare several activities side by side."""
@@ -292,6 +295,7 @@ def compare_command(args: argparse.Namespace) -> int:
         plt.close(figure)
         print(f"\nwrote {args.out}")
     return 0
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
