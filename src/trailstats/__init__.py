@@ -1,2 +1,5 @@
-def hello() -> str:
-    return "Hello from trailstats!"
+"""trailstats: offline analysis of GPX activity recordings."""
+
+from trailstats.models import Track, TrackPoint
+
+__all__ = ["Track", "TrackPoint"]
